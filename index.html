@@ -584,8 +584,10 @@
                             if (!globalTally[qId][opt]) {
                                 globalTally[qId][opt] = { totalPoints: 0, firstPlaceVotes: 0 };
                             }
-                            const invertedPoints = (5 - rank); // Rank 1 = 4pts, Rank 4 = 1pt
-                            globalTally[qId][opt].totalPoints += invertedPoints;
+                            
+                            // Adds the rank exactly as is (Rank 1 adds 1 pt, Rank 6 adds 6 pts)
+                            globalTally[qId][opt].totalPoints += rank;
+                            
                             if (rank === 1) {
                                 globalTally[qId][opt].firstPlaceVotes += 1;
                             }
