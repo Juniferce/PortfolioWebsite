@@ -44,6 +44,7 @@
             letter-spacing: 1px;
             box-shadow: 2px 3px 8px rgba(0,0,0,0.6);
             border-radius: 2px;
+            cursor: pointer;
         }
         #admin-btn:hover { background-color: #331818; }
 
@@ -541,7 +542,6 @@
                     quizOrder = data.order || localJsonData.order;
                     quizQuestions = data.questions || localJsonData.questions;
                     
-                    // Firestore Toggle: Display admin compilation button if set to true
                     if (data.adminButtonEnabled === true) {
                         document.getElementById('admin-btn').style.display = 'block';
                     }
@@ -556,57 +556,58 @@
             renderQuestions();
         }
 
-        // Global context compilation script
+        // --- Core Aggregation Engine (Runs Silently) ---
+        async function compileTotalsSilent() {
+            const querySnapshot = await getDocs(collection(db, "results"));
+            const globalTally = {};
+
+            querySnapshot.forEach((docSnap) => {
+                const userData = docSnap.data();
+                const responses = userData.responses || {};
+
+                for (const [qId, ans] of Object.entries(responses)) {
+                    if (!globalTally[qId]) {
+                        globalTally[qId] = {};
+                    }
+
+                    if (typeof ans === 'string') {
+                        // Multiple Choice
+                        globalTally[qId][ans] = (globalTally[qId][ans] || 0) + 1;
+                    } else if (Array.isArray(ans)) {
+                        // Multi-Select Checkboxes
+                        ans.forEach(opt => {
+                            globalTally[qId][opt] = (globalTally[qId][opt] || 0) + 1;
+                        });
+                    } else if (typeof ans === 'object' && ans !== null) {
+                        // Drag-and-Drop Rankings 
+                        for (const [opt, rank] of Object.entries(ans)) {
+                            if (!globalTally[qId][opt]) {
+                                globalTally[qId][opt] = { totalPoints: 0, firstPlaceVotes: 0 };
+                            }
+                            const invertedPoints = (5 - rank); // Rank 1 = 4pts, Rank 4 = 1pt
+                            globalTally[qId][opt].totalPoints += invertedPoints;
+                            if (rank === 1) {
+                                globalTally[qId][opt].firstPlaceVotes += 1;
+                            }
+                        }
+                    }
+                }
+            });
+
+            await setDoc(doc(db, "quiz", "totals"), {
+                lastCalculated: new Date(),
+                tallies: globalTally
+            });
+        }
+
+        // --- Manual Admin Override Button ---
         window.runAdminUpdate = async function() {
             const adminBtn = document.getElementById('admin-btn');
             adminBtn.innerText = "Compiling...";
             adminBtn.disabled = true;
 
             try {
-                const querySnapshot = await getDocs(collection(db, "results"));
-                const globalTally = {};
-
-                querySnapshot.forEach((docSnap) => {
-                    const userData = docSnap.data();
-                    const responses = userData.responses || {};
-
-                    for (const [qId, ans] of Object.entries(responses)) {
-                        if (!globalTally[qId]) {
-                            globalTally[qId] = {};
-                        }
-
-                        if (typeof ans === 'string') {
-                            // Multiple Choice
-                            globalTally[qId][ans] = (globalTally[qId][ans] || 0) + 1;
-                        } else if (Array.isArray(ans)) {
-                            // Multi-Select Checkboxes
-                            ans.forEach(opt => {
-                                globalTally[qId][opt] = (globalTally[qId][opt] || 0) + 1;
-                            });
-                        } else if (typeof ans === 'object' && ans !== null) {
-                            // Drag-and-Drop Rankings 
-                            // Tracks exact choice positioning metrics (e.g. Total point weight & total #1 ranks)
-                            for (const [opt, rank] of Object.entries(ans)) {
-                                if (!globalTally[qId][opt]) {
-                                    globalTally[qId][opt] = { totalPoints: 0, firstPlaceVotes: 0 };
-                                }
-                                // Points: Inverse distribution logic (Rank 1 gives 4 points, Rank 4 gives 1 point)
-                                const invertedPoints = (5 - rank);
-                                globalTally[qId][opt].totalPoints += invertedPoints;
-                                if (rank === 1) {
-                                    globalTally[qId][opt].firstPlaceVotes += 1;
-                                }
-                            }
-                        }
-                    }
-                });
-
-                // Commit the calculated aggregates into a standalone document
-                await setDoc(doc(db, "quiz", "totals"), {
-                    lastCalculated: new Date(),
-                    tallies: globalTally
-                });
-
+                await compileTotalsSilent();
                 alert("System Update Complete! Metrics consolidated into document: 'quiz/totals'");
             } catch (err) {
                 console.error("Aggregation calculation pipeline broken: ", err);
@@ -749,6 +750,10 @@
                         responses: answers
                     });
 
+                    // Trigger the silent calculation immediately after user saves
+                    await compileTotalsSilent();
+
+                    // Play outro
                     executeArchiveCinematic();
 
                 } catch (e) {
