@@ -135,6 +135,7 @@
             margin: 20px 0;
         }
 
+        /* Single Choice (Radios) */
         .radio-label {
             display: flex;
             align-items: center;
@@ -150,7 +151,7 @@
             width: 18px; 
             height: 18px;
             border: 2px solid #222;
-            border-radius: 3px 255px 4px 20px / 255px 4px 215px 5px;
+            border-radius: 3px 255px 4px 20px / 255px 4px 215px 5px; /* Circular sketchy */
             margin-right: 14px;
             position: relative;
             flex-shrink: 0;
@@ -162,6 +163,39 @@
             position: absolute;
             top: -9px; left: 1px;
             font-size: 23px;
+            font-weight: bold;
+            color: #111;
+            filter: url('#jitter');
+        }
+
+        /* Multiple Choice (Checkboxes) */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+            user-select: none;
+        }
+
+        input[type="checkbox"] { display: none; }
+
+        .check-box {
+            display: inline-block;
+            width: 18px; 
+            height: 18px;
+            border: 2px solid #222;
+            border-radius: 2px 5px 3px 4px / 5px 3px 4px 2px; /* Squarish sketchy */
+            margin-right: 14px;
+            position: relative;
+            flex-shrink: 0;
+            background: transparent;
+        }
+
+        input[type="checkbox"]:checked + .check-box::after {
+            content: '✖';
+            position: absolute;
+            top: -10px; left: 0px;
+            font-size: 24px;
             font-weight: bold;
             color: #111;
             filter: url('#jitter');
@@ -410,9 +444,9 @@
     <div id="game-board">
         <div class="paper-wrapper">
             <div class="paper-slip intro-slip active" id="start-screen">
-                <h2>Sidequest Interest Survey</h2>
-                <p>Fill out the form gang, I want to run something for 4 people.</p>
-                <button id="start-btn">SURE!</button>
+                <h2>Welcome to the Table</h2>
+                <p>Gather your thoughts. Answer the prompts on the slips of paper.</p>
+                <button id="start-btn">Begin</button>
             </div>
         </div>
     </div>
@@ -427,7 +461,7 @@
     </div>
 
     <div id="blackout-curtain">
-        <div class="submission-notice">Survey results submitted, thanks.</div>
+        <div class="submission-notice">Answers submitted</div>
     </div>
 
     <script type="module">
@@ -446,14 +480,20 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Updated Data Structure with multi-select included
         const localJsonData = {
-            order: ['q-identity', 'q-scenario', 'q-loot'],
+            order: ['q-identity', 'q-scenario', 'q-traits', 'q-loot'],
             questions: {
                 'q-identity': { type: 'free-write', text: 'Who are you? (This name secures your records)' },
                 'q-scenario': { 
                     type: 'multiple-choice', 
                     text: 'What kind of scenario do you prefer for a campaign?', 
                     options: ['High Fantasy', 'Cyberpunk', 'Cosmic Horror', 'Historical Fiction'] 
+                },
+                'q-traits': { 
+                    type: 'multi-select', 
+                    text: 'Which of the following character traits apply to you? (Select all that apply)', 
+                    options: ['Darkvision', 'Light Armor Proficiency', 'Cursed by a Hag', 'Wanted for Treason'] 
                 },
                 'q-loot': { 
                     type: 'ranked', 
@@ -545,6 +585,18 @@
                         `;
                     });
                     contentHTML += `</div>`;
+                } else if (q.type === 'multi-select') {
+                    contentHTML += `<div class="options-container">`;
+                    q.options.forEach((opt) => {
+                        contentHTML += `
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="q-${index}" value="${opt}">
+                                <span class="check-box"></span>
+                                <span>${opt}</span>
+                            </label>
+                        `;
+                    });
+                    contentHTML += `</div>`;
                 } else if (q.type === 'free-write') {
                     contentHTML += `<textarea id="ans-${index}" placeholder="Scribe your answer..."></textarea>`;
                 } else if (q.type === 'ranked') {
@@ -588,6 +640,10 @@
                 const selected = document.querySelector(`input[name="q-${index}"]:checked`);
                 if (!selected) { alert("Please make a mark."); return; }
                 answerData = selected.value;
+            } else if (q.type === 'multi-select') {
+                const selectedElements = document.querySelectorAll(`input[name="q-${index}"]:checked`);
+                if (selectedElements.length === 0) { alert("Please make at least one mark."); return; }
+                answerData = Array.from(selectedElements).map(el => el.value);
             } else if (q.type === 'free-write') {
                 const text = document.getElementById(`ans-${index}`).value;
                 if (!text.trim()) { alert("The paper remains blank."); return; }
@@ -658,7 +714,6 @@
 
             setTimeout(() => {
                 // 2. Append the folder to the document flow and scroll smoothly down to it
-                // We do NOT hide the game board so the background table remains perfectly intact.
                 dock.style.display = 'flex';
                 dock.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
@@ -673,7 +728,6 @@
 
                         setTimeout(() => {
                             // Send them dive-bombing downwards into the front pocket partition
-                            // They will magically appear over the top edge of the screen and drop in
                             wrap.style.setProperty('opacity', '1', 'important');
                             wrap.style.setProperty('top', '150px', 'important'); 
                             wrap.style.setProperty('transform', `translate(-50%, 0) scale(0.7) rotate(${Math.random() * 8 - 4}deg)`, 'important');
@@ -692,7 +746,7 @@
 
                     }, (wrappers.length * 240) + 1200);
 
-                }, 1000); // 1-second delay lets the camera finish scrolling smoothly
+                }, 1000); 
 
             }, 600);
         }
