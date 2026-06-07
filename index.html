@@ -1,61 +1,711 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js" defer></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JUNIFERSAL STUDIOS</title>
+    <title>Tabletop Quiz</title>
+    <style>
+        /* Force scrollbars completely invisible across all platforms */
+        html, body {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            overflow-y: scroll;
+            margin: 0;
+            padding: 0;
+            background-color: #0d0805;
+        }
+        
+        html::-webkit-scrollbar, body::-webkit-scrollbar {
+            display: none;
+        }
+
+        body {
+            /* Dark, rich mahogany table texture */
+            background-image: linear-gradient(rgba(18, 11, 6, 0.92), rgba(18, 11, 6, 0.92)), url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+            background-size: 400px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #222;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* --- LAYER 1: Initial Absolute Darkness (Flickers OUT) --- */
+        #pitch-black-blanket {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #000000;
+            z-index: 1000;
+            pointer-events: none;
+            animation: darkness-flicker-out 1.4s ease-out 0.2s forwards;
+        }
+
+        @keyframes darkness-flicker-out {
+            0% { opacity: 1; }
+            4% { opacity: 0.7; }
+            8% { opacity: 0.9; }
+            14% { opacity: 0.2; }
+            18% { opacity: 0.85; }
+            24% { opacity: 0.05; }
+            28% { opacity: 0.6; }
+            36% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+
+        /* --- LAYER 2: The Hanging Tabletop Lamp (Sways Slowly) --- */
+        #overhead-lamp-vignette {
+            position: fixed; /* Stays centered on the camera as we scroll */
+            top: -50vh; left: -50vw;
+            width: 200vw; height: 200vh;
+            background: radial-gradient(circle at center, transparent 15%, rgba(0, 0, 0, 0.4) 35%, rgba(0, 0, 0, 0.95) 70%);
+            pointer-events: none;
+            z-index: 999;
+            transform-origin: center center;
+            animation: lamp-sway 7s ease-in-out infinite;
+        }
+
+        @keyframes lamp-sway {
+            0% { transform: scale(1.1) translate(-25px, -15px); }
+            50% { transform: scale(1.1) translate(25px, 15px); }
+            100% { transform: scale(1.1) translate(-25px, -15px); }
+        }
+
+        #game-board {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 5vh;
+            position: relative;
+            z-index: 10;
+        }
+
+        .intro-slip {
+            margin-top: 35vh;
+            margin-bottom: 50vh;
+            text-align: center;
+        }
+
+        /* --- Ripped Paper & Ink Engine --- */
+        .paper-slip {
+            background-color: #fdf8e4;
+            width: 90%;
+            max-width: 600px;
+            margin-bottom: 70vh;
+            padding: 40px 50px;
+            position: relative;
+            transform: rotate(-0.8deg);
+            opacity: 0.4;
+            transition: opacity 0.5s ease, transform 0.3s ease;
+            
+            clip-path: polygon(
+                0% 1%, 4% 0%, 9% 2%, 14% 0%, 21% 1%, 26% 0%, 31% 2%, 37% 0%, 42% 1%, 48% 0%, 53% 2%, 59% 0%, 64% 1%, 71% 0%, 76% 2%, 82% 0%, 88% 1%, 93% 0%, 97% 2%, 100% 1%,
+                100% 99%, 94% 100%, 89% 98%, 83% 100%, 78% 99%, 72% 100%, 66% 98%, 61% 100%, 55% 99%, 49% 100%, 43% 98%, 38% 100%, 32% 99%, 27% 100%, 20% 98%, 14% 100%, 8% 99%, 0% 100%
+            );
+            
+            filter: url('#jitter');
+        }
+
+        .paper-wrapper {
+            filter: drop-shadow(4px 10px 15px rgba(0, 0, 0, 0.85));
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .paper-wrapper:nth-child(even) .paper-slip {
+            transform: rotate(1.2deg);
+        }
+
+        .paper-slip.active {
+            opacity: 1;
+        }
+
+        h2 {
+            margin-top: 0;
+            border-bottom: 2px dashed rgba(0,0,0,0.25);
+            padding-bottom: 10px;
+        }
+
+        /* --- Hand-drawn Forms --- */
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+            user-select: none;
+        }
+
+        input[type="radio"] { display: none; }
+
+        .radio-box {
+            display: inline-block;
+            width: 18px; 
+            height: 18px;
+            border: 2px solid #222;
+            border-radius: 3px 255px 4px 20px / 255px 4px 215px 5px;
+            margin-right: 14px;
+            position: relative;
+            flex-shrink: 0;
+            background: transparent;
+        }
+
+        input[type="radio"]:checked + .radio-box::after {
+            content: '✔';
+            position: absolute;
+            top: -9px; left: 1px;
+            font-size: 23px;
+            font-weight: bold;
+            color: #111;
+            filter: url('#jitter');
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            background: transparent;
+            border: 1px solid rgba(0,0,0,0.35);
+            border-radius: 255px 12px 225px 15px / 15px 225px 12px 255px;
+            font-family: inherit;
+            padding: 12px;
+            resize: vertical;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        /* --- Drag / Drop Rankings --- */
+        .rank-container {
+            display: flex;
+            gap: 25px;
+            margin-top: 15px;
+        }
+
+        .number-bank {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 15px;
+            border: 2px dashed rgba(0,0,0,0.2);
+            border-radius: 4px;
+            min-height: 120px;
+            min-width: 45px;
+            align-items: center;
+            background: rgba(0,0,0,0.02);
+        }
+
+        .draggable-num {
+            width: 32px; 
+            height: 32px;
+            border: 2px solid #222;
+            border-radius: 240px 15px 215px 12px / 15px 200px 15px 240px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-weight: bold; 
+            font-size: 16px; 
+            cursor: grab;
+            background-color: #fdf8e4;
+            user-select: none;
+        }
+
+        .draggable-num:active { cursor: grabbing; }
+
+        .rank-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-grow: 1;
+        }
+
+        .rank-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .drop-zone {
+            width: 36px; 
+            height: 36px;
+            border-bottom: 2px dashed rgba(0,0,0,0.4);
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        button {
+            background-color: #243342;
+            color: #fdf8e4;
+            border: none;
+            padding: 12px 24px;
+            font-family: inherit;
+            font-size: 15px;
+            cursor: pointer;
+            border-radius: 2px;
+            box-shadow: 2px 3px 7px rgba(0,0,0,0.6);
+            margin-top: 15px;
+            transition: background 0.2s;
+        }
+
+        button:hover { background-color: #141d26; }
+        button:disabled { background-color: #616c77; cursor: not-allowed; box-shadow: none; }
+
+        /* --- Massive Archival Packet (Scrolls Naturally into View) --- */
+        .folder-container {
+            position: relative; /* Now sits naturally beneath the questions */
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+            z-index: 20;
+            overflow: hidden;
+            margin-top: 10vh; /* A little breathing room from the final question */
+        }
+
+        .folder-wrapper {
+            position: relative;
+            width: 650px;
+            height: 900px; 
+            margin-bottom: -450px; /* Forces bottom half entirely out of the container bounds */
+            perspective: 2000px;
+        }
+
+        /* The structural back wall */
+        .folder-back {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, #ccae75 0%, #a88846 100%);
+            border-radius: 6px;
+            box-shadow: inset -4px -4px 15px rgba(0,0,0,0.2), 0 12px 35px rgba(0,0,0,0.9);
+            z-index: 2; /* Set to layer 2 */
+            box-sizing: border-box;
+        }
+
+        /* Top sealing flap */
+        .folder-flap {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 220px; 
+            background: linear-gradient(to bottom, #d9be85 0%, #b89753 100%);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+            
+            /* Sits perfectly on the bottom layer while open so papers fly over it */
+            z-index: 1; 
+            
+            transform-origin: top center;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), z-index 0s;
+            clip-path: polygon(0% 0%, 100% 0%, 88% 100%, 12% 100%);
+        }
+
+        .folder-wrapper.open .folder-flap {
+            transform: rotateX(180deg); /* Bent completely backwards/upwards */
+        }
+
+        .folder-wrapper.closed .folder-flap {
+            transform: rotateX(0deg); /* Folds down over the front */
+            /* Snaps immediately to the top layer so it can fold over the front wall */
+            z-index: 5; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+        }
+
+        /* The main rectangular body */
+        .folder-front {
+            position: absolute;
+            width: 100%;
+            height: 100%; /* Spans full height of folder, eliminating gap */
+            bottom: 0;
+            left: 0;
+            background: linear-gradient(135deg, #d9be85 0%, #b5934f 100%);
+            border-radius: 6px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+            z-index: 4; /* Layer 4, sits directly in front of the papers */
+            box-sizing: border-box;
+        }
+
+        /* Internal containment layer for flying sheets */
+        #folder-papers-sink {
+            position: absolute;
+            width: 100%; 
+            height: 100%;
+            z-index: 3; /* Sandwiched perfectly between back wall and front body */
+        }
+
+        /* Structural override rules to cleanly force offscreen transition states */
+        #folder-papers-sink .paper-wrapper {
+            position: absolute !important;
+            left: 50% !important;
+            top: -1200px !important; /* Starts way above the viewport */
+            width: 85% !important;
+            margin: 0 !important;
+            opacity: 0 !important;
+            transform: translate(-50%, 0) scale(0.7) !important; 
+            filter: drop-shadow(4px 10px 18px rgba(0,0,0,0.6)) !important;
+            transition: top 1.1s cubic-bezier(0.16, 1, 0.3, 1), transform 1.1s ease, opacity 0.4s ease !important;
+        }
+
+        /* --- Cinematic Outro Screen --- */
+        #blackout-curtain {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #000000;
+            z-index: 10000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 2.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #blackout-curtain.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .submission-notice {
+            color: #eae6df;
+            font-size: 26px;
+            letter-spacing: 4px;
+            opacity: 0;
+            transition: opacity 1.5s ease 1s;
+        }
+
+        #blackout-curtain.active .submission-notice {
+            opacity: 1;
+        }
+    </style>
 </head>
 <body>
 
-    <div class="bg-slideshow">
-        <div class="bg-slide"></div>
-        <div class="bg-slide"></div>
-        <div class="bg-slide"></div>
-        <div class="bg-slide"></div>
-        <div class="bg-slide"></div>
+    <script>
+        if ('history' in window) {
+            history.scrollRestoration = 'manual';
+        }
+        window.scrollTo(0, 0);
+    </script>
+
+    <svg style="display:none;">
+        <defs>
+            <filter id="jitter">
+                <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" result="noise" id="turb" seed="0" />
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+        </defs>
+    </svg>
+
+    <div id="pitch-black-blanket"></div>
+    <div id="overhead-lamp-vignette"></div>
+
+    <div id="game-board">
+        <div class="paper-wrapper">
+            <div class="paper-slip intro-slip active" id="start-screen">
+                <h2>Welcome to the Table</h2>
+                <p>Gather your thoughts. Answer the prompts on the slips of paper.</p>
+                <button id="start-btn">Begin</button>
+            </div>
+        </div>
     </div>
 
-    <header>
-        <nav id="nav-container">
-            <a href="multimedia.html" class="nav-item">
-                <div class="glow-border"></div><div class="inner-bg"></div>
-                <img src="https://placehold.co/400x400/222/FFF?text=Media" class="tab-image" alt="Multimedia">
-                <span class="tab-text">MULTIMEDIA</span>
-            </a>
-
-            <a href="gamedev.html" class="nav-item">
-                <div class="glow-border"></div><div class="inner-bg"></div>
-                <img src="https://placehold.co/400x400/222/FFF?text=Code" class="tab-image" alt="Game Dev">
-                <span class="tab-text">GAME DEV</span>
-            </a>
-            
-            <a href="future.html" class="nav-item">
-                <div class="glow-border"></div><div class="inner-bg"></div>
-                <img src="https://placehold.co/400x400/222/FFF?text=Future" class="tab-image" alt="Future">
-                <span class="tab-text">FUTURE</span>
-            </a>
-            
-            <a href="ttrpgs.html" class="nav-item">
-                <div class="glow-border"></div><div class="inner-bg"></div>
-                <img src="https://placehold.co/400x400/222/FFF?text=Dice" class="tab-image" alt="TTRPGS">
-                <span class="tab-text">TTRPGS</span>
-            </a>
-            
-            <a href="contacts.html" class="nav-item">
-                <div class="glow-border"></div><div class="inner-bg"></div>
-                <img src="https://placehold.co/400x400/222/FFF?text=Phone" class="tab-image" alt="Contacts">
-                <span class="tab-text">CONTACTS</span>
-            </a>
-        </nav>
-    </header>
-
-    <main class="home-hero">
-        <div class="name-container">
-            <h1 class="cursive-name">Carter Till</h1>
-            <p class="alias-text">Known as Juniferce online</p>
+    <div class="folder-container" id="archive-dock">
+        <div class="folder-wrapper open" id="manila-folder">
+            <div class="folder-back"></div>
+            <div id="folder-papers-sink"></div>
+            <div class="folder-front"></div>
+            <div class="folder-flap"></div>
         </div>
-    </main>
+    </div>
+
+    <div id="blackout-curtain">
+        <div class="submission-notice">Answers submitted</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVs7GHiN_jh5gJryIH-ORSTvTuhUsRvOo",
+            authDomain: "junis-quiz.firebaseapp.com",
+            projectId: "junis-quiz",
+            storageBucket: "junis-quiz.firebasestorage.app",
+            messagingSenderId: "939560292965",
+            appId: "1:939560292965:web:5ff11a49897aea4fefec8c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const localJsonData = {
+            order: ['q-identity', 'q-scenario', 'q-loot'],
+            questions: {
+                'q-identity': { type: 'free-write', text: 'Who are you? (This name secures your records)' },
+                'q-scenario': { 
+                    type: 'multiple-choice', 
+                    text: 'What kind of scenario do you prefer for a campaign?', 
+                    options: ['High Fantasy', 'Cyberpunk', 'Cosmic Horror', 'Historical Fiction'] 
+                },
+                'q-loot': { 
+                    type: 'ranked', 
+                    text: 'Rank these loot priorities (Drag the slips):', 
+                    options: ['Magical Weapons', 'Gold/Currency', 'Lore/Secret Documents', 'Health Potions'] 
+                }
+            }
+        };
+
+        let quizOrder = [];
+        let quizQuestions = {};
+        let answers = {};
+
+        // Hard baseline reset snap to coordinate zero immediately
+        window.scrollTo(0, 0);
+
+        // Constant loop modifying the turbulence filter generation seed
+        setInterval(() => {
+            const turb = document.getElementById('turb');
+            if(turb) turb.setAttribute('seed', Math.random() * 100);
+        }, 130);
+
+        // Native System Drag and Drop Implementations
+        window.allowDrop = function(ev) { ev.preventDefault(); };
+        window.drag = function(ev) { ev.dataTransfer.setData("text", ev.target.id); };
+        window.drop = function(ev, targetElement) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            const draggedEl = document.getElementById(data);
+            if (!draggedEl) return;
+
+            const parentSlip = targetElement.closest('.paper-slip');
+            const localBank = parentSlip.querySelector('.number-bank');
+
+            if (targetElement.classList.contains('drop-zone')) {
+                if (targetElement.children.length > 0) {
+                    localBank.appendChild(targetElement.children[0]);
+                }
+                targetElement.appendChild(draggedEl);
+            } else if (targetElement.classList.contains('number-bank')) {
+                targetElement.appendChild(draggedEl);
+            }
+        };
+
+        async function fetchQuestions() {
+            try {
+                const docRef = doc(db, "quiz", "data");
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists() && docSnap.data().order && docSnap.data().questions) {
+                    quizOrder = docSnap.data().order;
+                    quizQuestions = docSnap.data().questions;
+                } else {
+                    quizOrder = localJsonData.order;
+                    quizQuestions = localJsonData.questions;
+                }
+            } catch (error) {
+                quizOrder = localJsonData.order;
+                quizQuestions = localJsonData.questions;
+            }
+            renderQuestions();
+        }
+
+        function renderQuestions() {
+            const gameBoard = document.getElementById('game-board');
+            
+            quizOrder.forEach((qId, index) => {
+                const q = quizQuestions[qId];
+                if (!q) return;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'paper-wrapper';
+
+                const slip = document.createElement('div');
+                slip.className = 'paper-slip';
+                slip.id = `question-${index}`;
+                
+                let contentHTML = `<h2>Question ${index + 1}</h2><p><strong>${q.text}</strong></p>`;
+
+                if (q.type === 'multiple-choice') {
+                    contentHTML += `<div class="options-container">`;
+                    q.options.forEach((opt) => {
+                        contentHTML += `
+                            <label class="radio-label">
+                                <input type="radio" name="q-${index}" value="${opt}">
+                                <span class="radio-box"></span>
+                                <span>${opt}</span>
+                            </label>
+                        `;
+                    });
+                    contentHTML += `</div>`;
+                } else if (q.type === 'free-write') {
+                    contentHTML += `<textarea id="ans-${index}" placeholder="Scribe your answer..."></textarea>`;
+                } else if (q.type === 'ranked') {
+                    contentHTML += `
+                        <div class="rank-container">
+                            <div class="number-bank" ondragover="allowDrop(event)" ondrop="drop(event, this)">
+                    `;
+                    q.options.forEach((_, i) => {
+                        contentHTML += `<div class="draggable-num" draggable="true" id="drag-${index}-${i}" ondragstart="drag(event)" data-val="${i + 1}">${i + 1}</div>`;
+                    });
+                    
+                    contentHTML += `</div><div class="rank-options">`;
+                    q.options.forEach((opt, i) => {
+                        contentHTML += `
+                            <div class="rank-row">
+                                <div class="drop-zone" id="zone-${index}-${i}" ondragover="allowDrop(event)" ondrop="drop(event, this)"></div>
+                                <label>${opt}</label>
+                            </div>
+                        `;
+                    });
+                    contentHTML += `</div></div>`;
+                }
+                
+                if (index < quizOrder.length - 1) {
+                    contentHTML += `<button onclick="submitAnswer('${qId}', ${index}, false)">Lock Answer</button>`;
+                } else {
+                    contentHTML += `<button onclick="submitAnswer('${qId}', ${index}, true)">Seal Record</button>`;
+                }
+
+                slip.innerHTML = contentHTML;
+                wrapper.appendChild(slip);
+                gameBoard.appendChild(wrapper);
+            });
+        }
+
+        window.submitAnswer = async function(qId, index, isFinal) {
+            const q = quizQuestions[qId];
+            let answerData = null;
+
+            if (q.type === 'multiple-choice') {
+                const selected = document.querySelector(`input[name="q-${index}"]:checked`);
+                if (!selected) { alert("Please make a mark."); return; }
+                answerData = selected.value;
+            } else if (q.type === 'free-write') {
+                const text = document.getElementById(`ans-${index}`).value;
+                if (!text.trim()) { alert("The paper remains blank."); return; }
+                answerData = text;
+            } else if (q.type === 'ranked') {
+                answerData = {};
+                let allFilled = true;
+                q.options.forEach((opt, i) => {
+                    const zone = document.getElementById(`zone-${index}-${i}`);
+                    if (zone.children.length === 0) {
+                        allFilled = false;
+                    } else {
+                        answerData[opt] = parseInt(zone.children[0].dataset.val);
+                    }
+                });
+                if (!allFilled) { alert("Please allocate all numbers."); return; }
+            }
+
+            answers[qId] = answerData;
+
+            const currentSlip = document.getElementById(`question-${index}`);
+            const btn = currentSlip.querySelector('button');
+            btn.innerText = "Locked";
+            btn.disabled = true;
+
+            if (!isFinal) {
+                const nextSlip = document.getElementById(`question-${index + 1}`);
+                nextSlip.classList.add('active');
+                nextSlip.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                btn.innerText = "Archiving...";
+                
+                try {
+                    const identityId = quizOrder[0];
+                    let userIdentity = answers[identityId];
+                    userIdentity = String(userIdentity).trim().replace(/\//g, '-');
+                    if (!userIdentity) userIdentity = "unknown_entity";
+
+                    const userDocRef = doc(db, "results", userIdentity);
+                    await setDoc(userDocRef, {
+                        lastUpdated: new Date(),
+                        identity: userIdentity,
+                        responses: answers
+                    });
+
+                    executeArchiveCinematic();
+
+                } catch (e) {
+                    console.error("Error writing document: ", e);
+                    alert("The records failed to lock.");
+                    btn.innerText = "Seal Record";
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        function executeArchiveCinematic() {
+            const dock = document.getElementById('archive-dock');
+            const folder = document.getElementById('manila-folder');
+            const sink = document.getElementById('folder-papers-sink');
+            const wrappers = Array.from(document.querySelectorAll('#game-board .paper-wrapper'));
+
+            // 1. Fade the papers off the top half of the table
+            wrappers.forEach(wrap => {
+                wrap.style.opacity = '0';
+                wrap.style.transform = 'scale(0.9) translateY(20px)';
+            });
+
+            setTimeout(() => {
+                // 2. Append the folder to the document flow and scroll smoothly down to it
+                // We do NOT hide the game board so the background table remains perfectly intact.
+                dock.style.display = 'flex';
+                dock.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+                // 3. Wait for the scroll animation to settle before triggering the fly-in
+                setTimeout(() => {
+                    wrappers.forEach((wrap, i) => {
+                        // Transfer nodes into structural containment chamber
+                        sink.appendChild(wrap);
+                        
+                        // Force structural browser layout refresh pass
+                        wrap.getBoundingClientRect();
+
+                        setTimeout(() => {
+                            // Send them dive-bombing downwards into the front pocket partition
+                            // They will magically appear over the top edge of the screen and drop in
+                            wrap.style.setProperty('opacity', '1', 'important');
+                            wrap.style.setProperty('top', '150px', 'important'); 
+                            wrap.style.setProperty('transform', `translate(-50%, 0) scale(0.7) rotate(${Math.random() * 8 - 4}deg)`, 'important');
+                        }, i * 240 + 50);
+                    });
+
+                    // 4. Close the top envelope flap once documents rest inside pocket bounds
+                    setTimeout(() => {
+                        folder.classList.remove('open');
+                        folder.classList.add('closed');
+
+                        // 5. Drop final blackout veil
+                        setTimeout(() => {
+                            document.getElementById('blackout-curtain').classList.add('active');
+                        }, 1300);
+
+                    }, (wrappers.length * 240) + 1200);
+
+                }, 1000); // 1-second delay lets the camera finish scrolling smoothly
+
+            }, 600);
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            const firstQ = document.getElementById('question-0');
+            if (firstQ) {
+                firstQ.classList.add('active');
+                firstQ.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+
+        fetchQuestions();
+    </script>
 </body>
 </html>
